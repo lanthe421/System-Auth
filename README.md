@@ -209,11 +209,32 @@ cp .env.example .env
 # Как минимум, обновите DATABASE_URL и SECRET_KEY
 ```
 
-5. **Настройте базу данных**:
-```bash
-# Создайте базу данных (убедитесь, что PostgreSQL запущен)
-createdb auth_db
+5. **Настройте PostgreSQL**:
 
+Убедитесь, что PostgreSQL установлен и запущен:
+```bash
+# Проверьте статус PostgreSQL
+# На Windows (если установлен как служба):
+sc query postgresql-x64-<version>
+
+# Или запустите через pgAdmin или другой инструмент управления
+```
+
+Создайте базу данных:
+```bash
+# Вариант 1: Через psql
+psql -U postgres
+CREATE DATABASE auth_db;
+\q
+
+# Вариант 2: Через командную строку (если доступна команда createdb)
+createdb -U postgres auth_db
+
+# Вариант 3: Через pgAdmin или другой GUI инструмент
+```
+
+6. **Примените миграции и заполните данные**:
+```bash
 # Запустите миграции для создания таблиц
 alembic upgrade head
 
@@ -230,14 +251,14 @@ python seed.py
   - Пароль: `admin123`
   - **⚠️ ВАЖНО**: Измените этот пароль сразу после первого входа!
 
-6. **Запустите приложение**:
+7. **Запустите приложение**:
 ```bash
 uvicorn app.main:app --reload
 ```
 
 API будет доступно по адресу `http://localhost:8000`
 
-7. **Доступ к документации API**:
+8. **Доступ к документации API**:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
@@ -605,14 +626,65 @@ pytest --cov=app --cov-report=html
 9. **Включите резервное копирование базы данных**
 10. **Регулярно проверяйте и ротируйте токены**
 
+## Работа с базой данных
+
+### Подключение через DBeaver
+
+Для визуального управления базой данных используйте DBeaver:
+
+**Параметры подключения:**
+```
+Host:     localhost
+Port:     8888
+Database: postgres
+Username: postgres
+Password: 1234
+```
+
+**Быстрая настройка:**
+1. Откройте DBeaver
+2. Создайте новое подключение (Ctrl+Shift+N)
+3. Выберите PostgreSQL
+4. Введите параметры выше
+5. Test Connection → Download драйвер (если нужно)
+6. Finish
+
+**Подробная инструкция:** См. файл `DBEAVER_CONNECTION.md`
+
+### Полезные SQL запросы
+
+```sql
+-- Просмотр всех пользователей с ролями
+SELECT u.email, u.first_name, r.name as role
+FROM users u
+LEFT JOIN user_roles ur ON u.id = ur.user_id
+LEFT JOIN roles r ON r.id = ur.role_id;
+
+-- Просмотр разрешений по ролям
+SELECT r.name as role, p.resource, p.action
+FROM roles r
+JOIN role_permissions rp ON r.id = rp.role_id
+JOIN permissions p ON p.id = rp.permission_id
+ORDER BY r.name, p.resource;
+
+-- Активные сессии
+SELECT u.email, s.created_at, s.expires_at
+FROM sessions s
+JOIN users u ON s.user_id = u.id
+WHERE s.is_valid = true AND s.expires_at > NOW();
+```
+
 ## Устранение неполадок
 
 ### Проблемы с подключением к базе данных
 
 **Ошибка**: `could not connect to server`
-- Убедитесь, что PostgreSQL запущен: `pg_ctl status`
+- Убедитесь, что PostgreSQL запущен
 - Проверьте DATABASE_URL в файле `.env`
-- Убедитесь, что база данных существует: `psql -l`
+- Проверьте, что PostgreSQL слушает на порту 8888:
+  ```bash
+  netstat -an | findstr 8888
+  ```
 
 ### Проблемы с миграциями
 
